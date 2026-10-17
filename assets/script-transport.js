@@ -3,7 +3,7 @@
  const allowed=new Set(['getWorkspace','saveWorkspace','getFolderInbox','scanFolders','readFolderDocument']);
  class ScriptTransport {
   #token='';#expires=0;
-  constructor({deploymentId,fetcher=fetch,now=Date.now,onAuthRequired=()=>{}}){
+  constructor({deploymentId,fetcher=(...args)=>root.fetch(...args),now=Date.now,onAuthRequired=()=>{}}){
    if(!/^[A-Za-z0-9_-]{20,250}$/.test(deploymentId))throw Error('The Google connection has not been configured.');
    Object.assign(this,{deploymentId,fetcher,now,onAuthRequired});this.writeOutcomeUncertain=false;
   }

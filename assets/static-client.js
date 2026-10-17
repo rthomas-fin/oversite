@@ -1,6 +1,7 @@
 (function(){
  'use strict';
  const config=window.OverSiteConnection,gate=document.getElementById('cloud-wait');
+ const assetVersion=document.currentScript?new URL(document.currentScript.src).search:'';
  let client,transport,loaded=false,loading=false,bootStarted=false;
  const make=(tag,text)=>{const e=document.createElement(tag);e.textContent=text;return e;};
  function showGate(message,enabled=true){
@@ -17,7 +18,7 @@
   if(loaded){strip.hidden=false;note.textContent=message;document.dispatchEvent(new Event('oversite-auth-required'));}
   else showGate(message);
  }
- function loadScript(name){return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='./assets/'+name+'.js';s.onload=resolve;s.onerror=()=>reject(Error('A dashboard file could not be loaded. Reload to try again.'));document.body.append(s);});}
+ function loadScript(name){return new Promise((resolve,reject)=>{const s=document.createElement('script');s.src='./assets/'+name+'.js'+assetVersion;s.onload=resolve;s.onerror=()=>reject(Error('A dashboard file could not be loaded. Reload to try again.'));document.body.append(s);});}
  async function openDashboard(){
   if(loading)return;loading=true;
   try{
