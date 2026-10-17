@@ -31,7 +31,11 @@
    }catch(error){
     if(error.authRequired)throw error;
     if(name==='saveWorkspace')this.writeOutcomeUncertain=true;
-    throw Error(name==='saveWorkspace'?'The save could not be confirmed. Export your edits and reload this page before trying another save.':'Google could not be reached. The next folder check will retry.');
+    if(name==='saveWorkspace')throw Error('The save could not be confirmed. Export your edits and reload this page before trying another save.');
+    const detail=response?'Google returned an unreadable response (HTTP '+response.status+').':
+     ['TimeoutError','AbortError'].includes(error.name)?'The Google request timed out.':
+     'The Google request failed before a response arrived ('+String(error.name||'Error')+': '+String(error.message||'connection failed').slice(0,180)+').';
+    throw Error(detail+' No financial records were changed. Try signing in again to reconnect.');
    }
    if(!response.ok||data.error||!data.done||!data.response||!Object.hasOwn(data.response,'result')){
     // Never retry a write after a script error: its underlying batch may have completed.
