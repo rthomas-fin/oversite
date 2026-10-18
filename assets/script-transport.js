@@ -1,6 +1,6 @@
 (function(root){
  'use strict';
- const allowed=new Set(['getWorkspace','saveWorkspace','getFolderInbox','scanFolders','readFolderDocument']);
+ const allowed=new Set(['getWorkspace','saveWorkspace','getFolderInbox','scanFolders','readFolderDocument','uploadFolderDocument','processFolderDocument','retryFolderDocument','getCreditPdf']);
  class ScriptTransport {
   #token='';#expires=0;
   constructor({deploymentId,fetcher=(...args)=>root.fetch(...args),now=Date.now,onAuthRequired=()=>{}}){

@@ -34,7 +34,7 @@
     browserPolling:true
    };
    bootStarted=true;
-   for(const name of ['core','worksheet','home','drive-poller','cloud'])await loadScript(name);
+   for(const name of ['core','worksheet','home','drive-poller','cloud','document-parser','pdf-lib','intake-ui'])await loadScript(name);
    loaded=true;strip.hidden=true;
   }catch(error){
    if(bootStarted&&!loaded){showGate('A dashboard file could not load. Reload this page to try again. No ledger changes were sent.',false);const retry=make('a','Reload dashboard');retry.href='./';retry.className='btn';gate.firstElementChild.append(retry);}
