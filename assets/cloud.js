@@ -5,6 +5,7 @@ window.OVERSITE_LOCAL_PREVIEW=document.body.dataset.localPreview==='true';
 const CLOUD={ready:false,loading:true,refreshing:false,saving:false,dirty:false,conflict:false,authRequired:false,readOnly:false,mode:'shared',version:null,email:'',owner:false,timer:null,seq:0,shared:null,docs:[],docsError:'',message:'Connecting…'};
 const BROWSER_POLLING=!!window.OverSiteTransport?.browserPolling;
 let folderPoller=null,folderStatus='Folder checks have not started',folderPendingRender=false;
+let cloudRefreshPending=false,cloudRefreshFolders=false,cloudUpdates=null;
 let privateScenariosLoaded=false;
 const scenarioStorageKey=()=> 'oversite-private-scenarios:'+CLOUD.email;
 function savePrivateScenarios(){try{sessionStorage.setItem(scenarioStorageKey(),JSON.stringify({baseline:baselineV3,scenarios:scenariosV3}));}catch{toast('Private scenarios could not be retained in this tab. Export a backup before reloading.');}}
@@ -29,9 +30,14 @@ async function rpcCloud(name,...args){
  const data=await r.json();if(!r.ok)throw Error(data.error||'The request could not be completed.');return data;
 }
 function normalizeCloudState(state){S=state;initV3();committedV3=deep(S);undoStates=[];v3Redo=[];v3LastChange=null;v3Cached=null;}
-function receiveCloud(r){CLOUD.loading=true;normalizeCloudState(r.state);CLOUD.version=r.version;CLOUD.shared=deep(S);CLOUD.email=r.email;CLOUD.owner=r.owner;CLOUD.ready=true;CLOUD.dirty=false;CLOUD.conflict=false;CLOUD.message=window.OVERSITE_LOCAL_PREVIEW?'Local migration check · sample records only':'Saved in Google · refresh checks every 30 seconds';CLOUD.loading=false;scenarioName='Shared working plan';render();document.getElementById('cloud-wait')?.remove();document.documentElement.classList.remove('cloud-loading');}
+function receiveCloud(r){CLOUD.loading=true;normalizeCloudState(r.state);CLOUD.version=r.version;CLOUD.shared=deep(S);CLOUD.email=r.email;CLOUD.owner=r.owner;CLOUD.ready=true;CLOUD.dirty=false;CLOUD.conflict=false;CLOUD.message=window.OVERSITE_LOCAL_PREVIEW?'Local migration check · sample records only':'Saved in Google · website changes save automatically';CLOUD.loading=false;scenarioName='Shared working plan';render();document.getElementById('cloud-wait')?.remove();document.documentElement.classList.remove('cloud-loading');}
 // All existing editors, date moves, splits, toggles and Undo call this same hook.
-persistV3=function(){if(CLOUD.loading)return;if(CLOUD.ready)savePrivateScenarios();CLOUD.seq++;CLOUD.dirty=true;clearTimeout(CLOUD.timer);if(CLOUD.ready&&!CLOUD.readOnly&&CLOUD.mode==='shared'&&!CLOUD.conflict)CLOUD.timer=setTimeout(saveCloud,1400);cloudPaint();};
+// Defer only until this edit's synchronous handlers finish, including source metadata.
+persistV3=function(){if(CLOUD.loading)return;if(CLOUD.ready)savePrivateScenarios();CLOUD.seq++;CLOUD.dirty=true;clearTimeout(CLOUD.timer);if(CLOUD.ready&&!CLOUD.readOnly&&CLOUD.mode==='shared'&&!CLOUD.conflict)CLOUD.timer=setTimeout(saveCloud,0);cloudPaint();};
+function notifyCloudChanged(folders=false){try{cloudUpdates?.postMessage({type:'workspace-changed',email:CLOUD.email,folders});}catch{}}
+function requestCloudRefresh(folders=false){cloudRefreshPending=true;cloudRefreshFolders=cloudRefreshFolders||folders;return refreshCloud(false);}
+function documentChangedCloud(){notifyCloudChanged(true);return requestCloudRefresh(true);}
+try{if(window.BroadcastChannel){cloudUpdates=new window.BroadcastChannel('oversite-workspace:'+String(window.OverSiteConnection?.deploymentId||'local'));cloudUpdates.onmessage=e=>{if(e.data?.type==='workspace-changed'&&e.data.email===CLOUD.email)requestCloudRefresh(!!e.data.folders);};}}catch{}
 async function saveCloud(){
  if(!CLOUD.ready||CLOUD.readOnly||CLOUD.authRequired||CLOUD.mode!=='shared'||CLOUD.conflict||CLOUD.saving||!CLOUD.dirty)return;
  CLOUD.saving=true;const seq=CLOUD.seq,snapshot=deep(S);cloudPaint();
@@ -39,17 +45,19 @@ async function saveCloud(){
  if(r.conflict){CLOUD.conflict=true;CLOUD.message=r.message;toast(r.message);return;}
  CLOUD.version=r.version;CLOUD.shared=deep(r.state);if(CLOUD.seq===seq){CLOUD.loading=true;S=r.state;initV3();committedV3=deep(S);CLOUD.loading=false;CLOUD.dirty=false;}
  CLOUD.message=(window.OVERSITE_LOCAL_PREVIEW?'Saved to local test session at ':'Saved to Google at ')+new Date().toLocaleTimeString();
+ notifyCloudChanged();
  }catch(e){CLOUD.authRequired=!!e.authRequired;CLOUD.conflict=!e.authRequired;CLOUD.message='Save paused: '+e.message;toast(CLOUD.message+' Your on-screen changes are retained; export a backup.');}
- finally{CLOUD.saving=false;cloudPaint();if(CLOUD.dirty&&!CLOUD.conflict&&!CLOUD.authRequired&&CLOUD.mode==='shared')CLOUD.timer=setTimeout(saveCloud,1200);}
+ finally{CLOUD.saving=false;cloudPaint();if(CLOUD.dirty&&!CLOUD.conflict&&!CLOUD.authRequired&&CLOUD.mode==='shared')CLOUD.timer=setTimeout(saveCloud,0);else if(cloudRefreshPending&&!CLOUD.dirty&&!CLOUD.conflict)void refreshCloud(false);}
 }
 async function refreshCloud(force=false){
  if(CLOUD.loading||CLOUD.refreshing||CLOUD.saving||CLOUD.authRequired)return;
  if(!force&&(CLOUD.dirty||(CLOUD.mode==='private'&&!CLOUD.readOnly)||document.querySelector('dialog[open]')||document.activeElement?.matches('input,textarea,select')))return;
  if(force&&CLOUD.dirty&&!confirm('Discard unsaved/private edits and load the shared plan? Export a backup first to preserve them.'))return;
- CLOUD.refreshing=true;const startSeq=CLOUD.seq,startMode=CLOUD.mode;
- try{const r=await rpcCloud('getWorkspace');if(CLOUD.seq!==startSeq||CLOUD.mode!==startMode||CLOUD.saving||(!force&&!safeFolderRender()))return;if(force||!CLOUD.ready||CLOUD.version!==r.version||CLOUD.readOnly!==!!r.readOnly){CLOUD.mode='shared';receiveCloud(r);}if(CLOUD.ready&&['files','credit'].includes(page)){const d=await rpcCloud('getFolderInbox');if(CLOUD.seq===startSeq&&JSON.stringify(d.items)!==JSON.stringify(CLOUD.docs)){CLOUD.docs=d.items;if(safeFolderRender())render();else folderPendingRender=true;}}}
- catch(e){CLOUD.authRequired=!!e.authRequired;CLOUD.message='Connection error: '+e.message;cloudPaint();const w=document.getElementById('cloud-wait');if(w){w.innerHTML='<div style="max-width:650px;padding:30px"><h2>OverSite connection needs attention</h2><p>'+esc(e.message)+'</p><p>Your records have not been changed. Reload to refresh your sign-in; contact the workspace owner if the problem continues.</p><a href="./">Try again</a></div>';}}
- finally{CLOUD.refreshing=false;}
+ CLOUD.refreshing=true;const startSeq=CLOUD.seq,startMode=CLOUD.mode,folders=cloudRefreshFolders||['files','credit'].includes(page);let failed=false;
+ cloudRefreshPending=false;cloudRefreshFolders=false;
+ try{const r=await rpcCloud('getWorkspace');if(CLOUD.seq!==startSeq||CLOUD.mode!==startMode||CLOUD.saving||(!force&&!safeFolderRender())){cloudRefreshPending=true;cloudRefreshFolders=cloudRefreshFolders||folders;return;}if(force||!CLOUD.ready||CLOUD.version!==r.version||CLOUD.readOnly!==!!r.readOnly){CLOUD.mode='shared';receiveCloud(r);}if(CLOUD.ready&&folders){const d=await rpcCloud('getFolderInbox');if(CLOUD.seq===startSeq&&JSON.stringify(d.items)!==JSON.stringify(CLOUD.docs)){CLOUD.docs=d.items;if(safeFolderRender())render();else folderPendingRender=true;}}}
+ catch(e){failed=true;cloudRefreshPending=true;cloudRefreshFolders=cloudRefreshFolders||folders;CLOUD.authRequired=!!e.authRequired;CLOUD.message='Connection error: '+e.message;cloudPaint();const w=document.getElementById('cloud-wait');if(w){w.innerHTML='<div style="max-width:650px;padding:30px"><h2>OverSite connection needs attention</h2><p>'+esc(e.message)+'</p><p>Your records have not been changed. Reload to refresh your sign-in; contact the workspace owner if the problem continues.</p><a href="./">Try again</a></div>';}}
+ finally{CLOUD.refreshing=false;if(cloudRefreshPending&&!failed&&CLOUD.mode==='shared'&&safeFolderRender())setTimeout(()=>{if(cloudRefreshPending)void refreshCloud(false);},0);}
 }
 function enterPrivateCloud(){clearTimeout(CLOUD.timer);CLOUD.mode='private';scenarioName='Private what-if';CLOUD.dirty=false;cloudPaint();}
 // Loading an older backup or scenario must not overwrite the shared plan automatically.
@@ -94,7 +102,7 @@ function startFolderPolling(){
  folderPoller=new window.OverSiteDrivePoller({
   scan:()=>rpcCloud('scanFolders'),
   canRun:()=>CLOUD.ready&&!CLOUD.saving&&!CLOUD.authRequired&&!window.OverSiteTransport.needsAuth()&&navigator.onLine&&document.visibilityState==='visible',
-  onResult:r=>{const changed=JSON.stringify(r.items)!==JSON.stringify(CLOUD.docs);CLOUD.docs=r.items||[];CLOUD.docsError=(r.errors||[]).join('; ');if(changed){if(['files','credit'].includes(page)&&safeFolderRender())render();else folderPendingRender=true;}},
+  onResult:r=>{const changed=JSON.stringify(r.items)!==JSON.stringify(CLOUD.docs);CLOUD.docs=r.items||[];CLOUD.docsError=(r.errors||[]).join('; ');if(changed){if(['files','credit'].includes(page)&&safeFolderRender())render();else folderPendingRender=true;}if(r.queued>0)void documentChangedCloud();},
   onStatus:s=>{folderStatus=s.message+(s.lastChecked?' · Last checked '+new Date(s.lastChecked).toLocaleTimeString():'')+(s.error?' · '+s.error:'');paintFolderStatus();}
  });
  folderPoller.start();
@@ -111,4 +119,6 @@ document.addEventListener('oversite-auth-required',()=>{CLOUD.authRequired=true;
 document.addEventListener('oversite-auth-ready',async()=>{CLOUD.authRequired=false;if(CLOUD.dirty)await saveCloud();else await refreshCloud(false);if(CLOUD.ready)startFolderPolling();folderPoller?.wake();});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){folderPoller?.wake();refreshCloud(false);}});
 window.addEventListener('online',()=>{folderPoller?.wake();refreshCloud(false);});
-document.addEventListener('focusout',()=>{setTimeout(()=>{if(folderPendingRender&&safeFolderRender()){folderPendingRender=false;render();}},0);});
+function settleCloudView(){setTimeout(()=>{if(cloudRefreshPending)void refreshCloud(false);if(folderPendingRender&&safeFolderRender()){folderPendingRender=false;render();}},0);}
+document.addEventListener('focusout',settleCloudView);
+document.addEventListener('close',settleCloudView,true);
