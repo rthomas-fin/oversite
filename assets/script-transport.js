@@ -47,6 +47,13 @@
    return data.response.result;
   }
  }
+ class TabSession {
+  constructor({storage,key,now=Date.now}){Object.assign(this,{storage,key,now});}
+  clear(){try{this.storage.removeItem(this.key);}catch{}}
+  save(token,seconds){try{if(typeof token!=='string'||!token||!Number.isFinite(Number(seconds)))return;this.storage.setItem(this.key,JSON.stringify({token,expiresAt:this.now()+Math.min(Number(seconds),3600)*1000}));}catch{}}
+  read(){try{const s=JSON.parse(this.storage.getItem(this.key)||'null');if(!s||typeof s.token!=='string'||!s.token||!Number.isFinite(s.expiresAt)||s.expiresAt-this.now()<=360000||s.expiresAt-this.now()>3600000){this.clear();return null;}return {token:s.token,seconds:(s.expiresAt-this.now())/1000};}catch{this.clear();return null;}}
+ }
+ root.OverSiteTabSession=TabSession;
  root.OverSiteScriptTransport=ScriptTransport;
  if(typeof module!=='undefined'&&module.exports)module.exports=ScriptTransport;
 })(typeof window==='undefined'?globalThis:window);

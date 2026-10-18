@@ -1,5 +1,6 @@
 /* Public connection identifiers only. Never put a token or client secret here. */
 window.OverSiteConnection=Object.freeze({
+ rememberTabSession:true,
  clientId:'193832733350-9gk38i7ajm08qor97aubq21snacn5jlk.apps.googleusercontent.com',
  deploymentId:'AKfycbz61nmgf0mBEWVHSJ_yPMc0WI0uSsVK1FX3o650zikHGhcQTMNaaJozwC1IZJXwmIoh9g',
  scopes:[

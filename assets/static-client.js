@@ -3,6 +3,8 @@
  const config=window.OverSiteConnection,gate=document.getElementById('cloud-wait');
  const assetVersion=document.currentScript?new URL(document.currentScript.src).search:'';
  let client,transport,loaded=false,loading=false,bootStarted=false;
+ let tabSession=null;
+ if(config?.rememberTabSession){try{tabSession=new window.OverSiteTabSession({storage:sessionStorage,key:'OverSite:auth:'+config.clientId+':'+config.deploymentId+':'+config.scopes.join(',')});}catch{}}
  const make=(tag,text)=>{const e=document.createElement(tag);e.textContent=text;return e;};
  function showGate(message,enabled=true){
   const box=make('section','');box.className='google-signin';
@@ -15,6 +17,7 @@
  const reconnect=make('button','Reconnect Google');reconnect.className='btn';reconnect.onclick=connect;
  const note=make('span','');strip.append(note,reconnect);document.body.prepend(strip);
  function authRequired(message='Google sign-in needs refreshing. Your edits remain on screen.'){
+  tabSession?.clear();
   if(loaded){strip.hidden=false;note.textContent=message;document.dispatchEvent(new Event('oversite-auth-required'));}
   else showGate(message);
  }
@@ -24,7 +27,7 @@
   try{
    const first=await transport.call('getWorkspace');
    if(!first?.state||!first.email||!first.version)throw Error('Google returned an incomplete ledger. No records were changed.');
-   if(loaded){strip.hidden=true;document.dispatchEvent(new Event('oversite-auth-ready'));return;}
+   if(loaded){strip.hidden=true;document.dispatchEvent(new Event('oversite-auth-ready'));return true;}
    document.getElementById('seed').textContent=JSON.stringify(first.state);
    window.OverSiteDefaults=first.uiDefaults||{};
    let cached=first;
@@ -36,6 +39,8 @@
    bootStarted=true;
    for(const name of ['core','worksheet','home','drive-poller','cloud','document-parser','pdf-lib','intake-ui'])await loadScript(name);
    loaded=true;strip.hidden=true;
+   const signOut=make('button','Sign out');signOut.className='btn';signOut.onclick=()=>{if(window.OverSiteCloud?.status().dirty&&!confirm('Sign out and discard unsaved on-screen edits? Export a backup first if needed.'))return;tabSession?.clear();transport.clearToken();location.reload();};document.querySelector('.top-actions')?.append(signOut);
+   return true;
   }catch(error){
    if(bootStarted&&!loaded){showGate('A dashboard file could not load. Reload this page to try again. No ledger changes were sent.',false);const retry=make('a','Reload dashboard');retry.href='./';retry.className='btn';gate.firstElementChild.append(retry);}
    else authRequired(error.message);
@@ -61,12 +66,14 @@
     reconnect.disabled=false;
     if(response.error){authRequired('Google sign-in was not completed. You can try again.');return;}
     if(!google.accounts.oauth2.hasGrantedAllScopes(response,...config.scopes)){transport.clearToken();authRequired('Google access was not fully granted. Reconnect to open your private ledger.');return;}
-    try{transport.setToken(response.access_token,response.expires_in);await openDashboard();}
+    try{const expiresAt=Date.now()+Number(response.expires_in)*1000;transport.setToken(response.access_token,response.expires_in);if(await openDashboard())tabSession?.save(response.access_token,(expiresAt-Date.now())/1000);}
     catch(error){authRequired(error.message);}
    },
    error_callback:()=>{reconnect.disabled=false;authRequired('The sign-in window was closed or blocked. Click Sign in to try again.');}
   });
-  showGate('Sign in to open your private financial dashboard.');
+  const existing=tabSession?.read();
+  if(existing){transport.setToken(existing.token,existing.seconds);showGate('Opening your private financial dashboard…',false);openDashboard();}
+  else showGate('Sign in to open your private financial dashboard.');
  };
  document.head.append(gis);
 })();
