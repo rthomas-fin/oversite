@@ -37,7 +37,7 @@ var OverSiteIntake = (function () {
   if(/\.(csv|tsv)$/i.test(name)){const rows=table(csv(text,/\.tsv$/i.test(name)?'\t':','));if(rows)return rows;}
   const pick=re=>(text.match(re)||[])[1]?.trim()||'';
   const amount=pick(/(?:amount\s*due|balance\s*due|grand\s*total|invoice\s*total|total\s*due)\s*[:\s]*\$?\s*([\d,]+\.\d{2})/i)||pick(/^total\s*[:\s]*\$?\s*([\d,]+\.\d{2})\s*$/im);
-  return [{invoice:pick(/(?:invoice\s*(?:number|no\.?|#|id))\s*[:#\s]*([A-Za-z0-9][A-Za-z0-9_./-]*)/i),party:pick(/^(?:vendor|supplier|customer|company|from)\s*:\s*([^\r\n]+)/im),amount:money(amount),date:date(pick(/(?:invoice\s*date|^date)\s*:\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})/im)),due:date(pick(/due\s*date\s*:\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})/i)),expected:''}];
+  return [{invoice:pick(/(?:invoice\s*(?:number|no\.?|#|id))\s*[:#\s]*([A-Za-z0-9][A-Za-z0-9_./-]*)/i),party:pick(/\b(?:vendor|supplier|customer|company|from)\s*:\s*([^\r\n]+)/i),amount:money(amount),date:date(pick(/(?:invoice\s*date|^date)\s*:\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})/im)),due:date(pick(/due\s*date\s*:\s*(\d{4}-\d{1,2}-\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{4})/i)),expected:''}];
  }
  function key(party,invoice){return String(party||'').trim().toLowerCase()+'|'+String(invoice||'').trim().toLowerCase();}
  return {date,money,csv,table,parse,key};

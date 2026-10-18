@@ -47,4 +47,13 @@ document.addEventListener('click',async e=>{const t=e.target.closest('[data-inta
  if(t.dataset.intake==='fill-pdf'){toast('Opening the application form…');await preparePdf(t.dataset.id);}
  if(t.dataset.intake==='download-pdf'){for(const input of intakeDialog.querySelectorAll('[data-pdf-field]'))draftFields[Number(input.dataset.pdfField)].setText(input.value);const bytes=await draftPdf.save();const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'})),a=document.createElement('a');a.href=url;a.download=draftName.replace(/\.pdf$/i,'')+' - draft.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);toast('Editable draft downloaded. Review and sign it yourself; nothing was submitted.');}
  }catch(err){toast(err.message);}});
+let intakeShowArchived=false;
+const renderReviewQueueIntake=reviewQueueIntake;
+reviewQueueIntake=function(){
+ const holder=document.createElement('div');holder.innerHTML=renderReviewQueueIntake();
+ holder.querySelector('.panel-head').insertAdjacentHTML('beforeend','<button class="btn small" data-intake="archive-toggle">'+(intakeShowArchived?'Hide archived':'Show archived')+'</button>');
+ for(const row of holder.querySelectorAll('tbody tr')){const id=row.querySelector('[data-intake="details"]')?.dataset.id,x=S.intake.find(r=>r.id===id);if(!x)continue;if(x.status==='Archived'&&!intakeShowArchived){row.remove();continue;}row.lastElementChild.insertAdjacentHTML('beforeend','<button class="text-btn" data-intake="archive" data-id="'+esc(id)+'">'+(x.status==='Archived'?'Restore review':'Archive review')+'</button>');}
+ return holder.innerHTML;
+};
+document.addEventListener('click',e=>{const t=e.target.closest('[data-intake]');if(!t)return;if(t.dataset.intake==='archive-toggle'){intakeShowArchived=!intakeShowArchived;render();}if(t.dataset.intake==='archive'){const x=S.intake.find(r=>r.id===t.dataset.id);if(x.status==='Archived'){x.status=x.statusBeforeArchive||'Needs review';delete x.statusBeforeArchive;}else{x.statusBeforeArchive=x.status;x.status='Archived';}save('Updated document review archive');render();}});
 render();
