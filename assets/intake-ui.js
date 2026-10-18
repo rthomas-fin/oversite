@@ -5,8 +5,8 @@ function intakeModal(heading,body){intakeDialog.innerHTML='<div style="padding:2
 async function intakeReady(){if(CLOUD.readOnly||CLOUD.mode!=='shared')throw Error('Return to the shared plan before uploading documents.');if(intakeBusy)throw Error('Wait for the current document operation.');if(CLOUD.dirty)await saveCloud();if(CLOUD.dirty||CLOUD.conflict||CLOUD.saving)throw Error('Resolve the pending shared save before processing documents.');}
 function fileBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(',')[1]);reader.onerror=()=>reject(Error('Could not read '+file.name));reader.readAsDataURL(file);});}
 ingestFiles=async function(files,bucket){
- try{await intakeReady();intakeBusy=true;let uploaded=0;const problems=[];
-  for(const file of Array.from(files).slice(0,20)){
+ try{if(files.length>20)throw Error('Choose up to 20 files at a time. No files were uploaded.');await intakeReady();intakeBusy=true;let uploaded=0;const problems=[];
+  for(const file of Array.from(files)){
    try{if(file.size>5000000)throw Error('Maximum file size is 5 MB.');toast('Uploading '+file.name+' to '+bucket+'…');const r=await rpcCloud('uploadFolderDocument',{name:file.name,bucket,data:await fileBase64(file)});uploaded++;toast('Extracting '+file.name+' for review…');await rpcCloud('processFolderDocument',r.id);}
    catch(e){problems.push(file.name+': '+e.message);if(e.authRequired)break;}
   }

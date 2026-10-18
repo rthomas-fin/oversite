@@ -2,7 +2,7 @@
 (function(root){
  'use strict';
  class DrivePoller {
-  constructor({scan,onResult=()=>{},onStatus=()=>{},canRun=()=>true,interval=60000,schedule=setTimeout,cancel=clearTimeout,now=Date.now}){
+  constructor({scan,onResult=()=>{},onStatus=()=>{},canRun=()=>true,interval=60000,schedule=(...args)=>root.setTimeout(...args),cancel=(...args)=>root.clearTimeout(...args),now=Date.now}){
    Object.assign(this,{scan,onResult,onStatus,canRun,interval,schedule,cancel,now});
    this.enabled=false;this.inFlight=null;this.timer=null;this.failures=0;this.lastChecked=null;
   }
