@@ -12,7 +12,7 @@ function documentUpdates(){
   const statuses=[...new Set(rows.map(r=>r.status))].join(', ');
   return {key:'source|'+(x.driveFileId||x.id)+'|'+x.sourceModified+'|'+statuses,title:x.filename,status:form?(problem?'Draft status unavailable':'Form not filled yet'):statuses,note:form?(problem?'Saved drafts could not be checked. Refresh drafts to try again.':'Only the original is saved. Fill the form using your company profile and answer any missing questions.'):[...new Set(rows.map(r=>r.note))].join(' '),url:x.sourceUrl,linkLabel:'Open original document ↗',time:x.processedAt,amount:rows.reduce((s,r)=>s+(r.amount||0),0),invoice:rows.length>1?rows.length+' invoice records':x.invoice,prepareId:form&&!problem?x.driveFileId:null};});
  const drafts=[...latestDrafts.entries()].filter(([key])=>!matched.has(key)).map(([,x])=>draftResult(x));
- return records.concat(drafts).sort((a,b)=>String(b.time).localeCompare(String(a.time)));
+ return records.concat(drafts).sort((a,b)=>Number(!!(b.download||b.prepareId))-Number(!!(a.download||a.prepareId))||String(b.time).localeCompare(String(a.time)));
 }
 function readUpdateSeen(){if(updateEmail===CLOUD.email)return;updateEmail=CLOUD.email;try{updateSeen=new Set(JSON.parse(localStorage.getItem('oversite-document-seen:'+CLOUD.email)||'[]'));}catch{updateSeen=new Set();}}
 function paintDocumentUpdates(){
