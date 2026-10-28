@@ -11,6 +11,8 @@
   box.append(make('h1','OverSite Financial Command Center'),make('p',message));
   const button=make('button','Sign in with Google');button.className='btn primary';button.disabled=!enabled;button.onclick=connect;
   box.append(button,make('p','Your financial records are loaded from your private Google Sheet after sign-in.'));
+  box.append(make('p','OverSite organizes receivables, bills, cash plans and documents using your connected Google workspace.'));
+  const links=make('nav','');links.setAttribute('aria-label','Workspace information');for(const [label,url] of [['Privacy','./privacy.html'],['Terms of use','./terms.html']]){const a=make('a',label);a.href=url;a.style.marginRight='18px';links.append(a);}box.append(links);
   gate.replaceChildren(box);
  }
  const strip=make('div','');strip.className='google-reconnect';strip.hidden=true;
