@@ -37,7 +37,7 @@
     browserPolling:true
    };
    bootStarted=true;
-   for(const name of ['core','worksheet','home','drive-poller','cloud','document-parser','pdf-lib','intake-ui'])await loadScript(name);
+   for(const name of ['core','worksheet','home','drive-poller','cloud','document-parser','pdf-lib','intake-ui','fflate','word-forms','form-ui'])await loadScript(name);
    loaded=true;strip.hidden=true;
    const signOut=make('button','Sign out');signOut.className='btn';signOut.onclick=()=>{if(window.OverSiteCloud?.status().dirty&&!confirm('Sign out and discard unsaved on-screen edits? Export a backup first if needed.'))return;tabSession?.clear();transport.clearToken();location.reload();};document.querySelector('.top-actions')?.append(signOut);
    return true;
