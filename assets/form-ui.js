@@ -1,9 +1,17 @@
 /* Private form preparation: verified profile -> questions -> saved Drive draft. */
-let creditFormSession=null,creditDraftItems=[],creditDraftProblem='';
+let creditFormSession=null,creditDraftItems=[],creditDraftProblem='',creditDraftLoaded=false,creditDraftLoading=null;
 function formBytes64(bytes){let text='';for(let i=0;i<bytes.length;i+=16384)text+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(text);}
 function creditDraftLinks(file){return `<a class="btn" href="${esc(file.webViewLink||file.url)}" target="_blank" rel="noopener">Open saved draft ↗</a>${file.webContentLink||file.downloadUrl?` <a class="btn primary" href="${esc(file.webContentLink||file.downloadUrl)}" target="_blank" rel="noopener">Download draft ↓</a>`:''}`;}
-async function loadCreditDrafts(){try{const r=await rpcCloud('getCreditDrafts');creditDraftItems=r.items||[];creditDraftProblem='';}catch(e){creditDraftProblem=e.message;}if(!document.querySelector('dialog[open]'))render();}
-function savedCreditDrafts(){return `<section class="panel section-gap"><div class="panel-head"><div><h2>Saved form drafts</h2><p class="sub">Stored beside the originals in Credit apps. Originals are unchanged.</p></div><button class="btn" data-form="refresh">Refresh drafts</button></div><div class="panel-body">${creditDraftProblem?`<p class="notice">${esc(creditDraftProblem)}</p>`:''}${creditDraftItems.length?creditDraftItems.slice().sort((a,b)=>String(b.modified).localeCompare(String(a.modified))).map(f=>`<p><b>${esc(f.name)}</b><span class="mini">${f.remaining?f.remaining+' unanswered fields · ':''}Unsigned draft · ${esc(String(f.modified||'').slice(0,10))}</span>${creditDraftLinks(f)}</p>`).join(''):'Upload a Word .docx or fillable PDF to Credit apps to prepare a draft.'}</div></section>`;}
+async function loadCreditDrafts(){
+ if(creditDraftLoading)return creditDraftLoading;
+ creditDraftLoading=(async()=>{try{const r=await rpcCloud('getCreditDrafts');creditDraftItems=r.items||[];creditDraftProblem='';}catch(e){creditDraftProblem=e.message;}finally{creditDraftLoaded=true;creditDraftLoading=null;}if(!document.querySelector('dialog[open]'))render();document.dispatchEvent(new Event('oversite-form-drafts-updated'));})();
+ return creditDraftLoading;
+}
+function savedCreditDrafts(){
+ const latest=new Map(),earlier=[];for(const f of creditDraftItems.slice().sort((a,b)=>String(b.modified).localeCompare(String(a.modified)))){const key=f.sourceId||f.id;if(latest.has(key))earlier.push(f);else latest.set(key,f);}
+ const row=(f,old=false)=>`<p><b>${esc(f.name)}</b><span class="mini">${old?'Earlier draft · ':''}${f.remaining?f.remaining+' unanswered fields':'Filled draft saved'} · Unsigned · ${esc(f.modified?new Date(f.modified).toLocaleString():'')}</span>${creditDraftLinks(f)}</p>`;
+ return `<section class="panel section-gap"><div class="panel-head"><div><h2>Saved form drafts</h2><p class="sub">The latest draft for each form is shown first. Review before use; signatures remain blank.</p></div><button class="btn" data-form="refresh">Refresh drafts</button></div><div class="panel-body">${creditDraftProblem?`<p class="notice">${esc(creditDraftProblem)}</p>`:''}${!creditDraftLoaded?'Checking saved drafts…':latest.size?[...latest.values()].map(f=>row(f)).join(''):'No saved draft found. Use Fill original form to prepare a Word .docx or fillable PDF.'}${earlier.length?`<details><summary>Earlier drafts (${earlier.length})</summary>${earlier.map(f=>row(f,true)).join('')}</details>`:''}</div></section>`;
+}
 const inboxBeforeForms=driveInboxCloud;
 driveInboxCloud=function(bucket){const holder=document.createElement('div');holder.innerHTML=inboxBeforeForms(bucket);for(const row of holder.querySelectorAll('tbody tr')){const action=row.querySelector('[data-cloud="read-doc"]');if(action&&creditDraftItems.some(f=>f.id===action.dataset.id)){row.children[2].textContent='Saved form draft';action.remove();}}return holder.innerHTML;};
 const filesWithIntake=filesScreenV3,creditWithIntake=creditScreenV3,queueWithIntake=reviewQueueIntake;
@@ -52,4 +60,5 @@ async function savePreparedCredit(){
 }
 document.addEventListener('click',async e=>{const t=e.target.closest('[data-form]');if(!t)return;try{if(t.dataset.form==='prepare')await openCreditForm(t.dataset.id);if(t.dataset.form==='save')await savePreparedCredit();if(t.dataset.form==='refresh')await loadCreditDrafts();}catch(error){toast(error.message);}});
 document.addEventListener('input',e=>{if(e.target.dataset.formAnswer&&creditFormSession)creditFormSession.answers[e.target.dataset.formAnswer]=e.target.value;});
+document.addEventListener('oversite-auth-ready',()=>loadCreditDrafts());
 loadCreditDrafts();
