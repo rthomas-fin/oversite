@@ -7,7 +7,7 @@
  const isManual=label=>/signature|signed|guarant|consent|authoriz(?!ed representative name)|social.security|\bssn\b|routing|account.number/i.test(label);
  function profileKey(label){
   const key=String(label).toLowerCase().replace(/[^a-z]/g,'');
-  const groups={legalName:['legalbusinessname','legalcompanyname','companyname','businessname','applicantname','customername'],dba:['dba','doingbusinessas'],address:['address','businessaddress','billingaddress','mailingaddress'],phone:['phone','businessphone','telephone'],email:['email','businessemail'],entityType:['entitytype','businesstype'],entityDescription:['companyentitydescription'],formationDate:['formationdate','dateestablished'],contact:['contact','contactname'],signatoryName:['printedname','signatoryname','authorizedrepresentativename'],signatoryTitle:['title','signatorytitle'],tradeReferences:['tradereferences']};
+  const groups={legalName:['legalbusinessname','legalcompanyname','companyname','businessname','applicantname','customername'],dba:['dba','doingbusinessas'],address:['address','businessaddress','billingaddress','mailingaddress'],phone:['phone','businessphone','telephone'],email:['email','businessemail'],entityType:['entitytype','businesstype'],entityDescription:['companyentitydescription'],formationState:['stateofformation','stateofincorporation'],formationDate:['formationdate','dateestablished'],contact:['contact','contactname'],ceoName:['ceo','ceoname','chiefexecutiveofficer'],ceoEmail:['ceoemail'],signatoryName:['printedname','signatoryname','authorizedrepresentativename'],signatoryTitle:['title','signatorytitle'],tradeReferences:['tradereferences']};
   return Object.keys(groups).find(k=>groups[k].includes(key));
  }
  function xml(text){
@@ -33,6 +33,9 @@
     let ancestor=p,excluded=false;
     while(ancestor&&ancestor!==doc){if(ancestor.namespaceURI===W&&['del','ins','sdt'].includes(ancestor.localName))excluded=true;ancestor=ancestor.parentNode;}
     if(excluded||elements(p,'fldChar').length||elements(p,'fldSimple').length)continue;
+    const identity=/\band\s+([^;()\[\]]{1,120}?),\s+a\s+(?:\[[^\]]+\]|[^;()]{1,200})\s*\([“"]Customer[”"]\)/i.exec(text);
+    const heading=/^(\s*CUSTOMER:\s*)(\S.*)$/i.exec(text);
+    if(identity||heading){const original=identity?identity[1]:heading[2],start=identity?identity.index+identity[0].indexOf(original):heading[1].length;fields.push({id:'word-'+fields.length,part:name,pIndex,start,end:start+original.length,label:identity?'Customer legal name — agreement':'Customer legal name — signing heading',context:'Existing customer name: '+original,existing:original,profileKey:'legalName',replaceFromProfile:true,manual:false});}
     for(const match of text.matchAll(/\[\s*_{2,}\s*\]|\{\{[^{}\r\n]{1,100}\}\}|_{3,}/g)){
      const before=text.slice(0,match.index),after=text.slice(match.index+match[0].length);
      let label=match[0].startsWith('{{')?match[0].slice(2,-2).trim():'';
@@ -57,6 +60,7 @@
     if(!notice&&existing)continue;
     if(notice&&elements(content,'p').filter(n=>elements(n,'t').some(t=>t.textContent.trim())).length>1)continue;
     if(['sdt','tbl','fldChar','del','ins'].some(tag=>elements(content,tag).length))continue;
+    if(notice&&existing){const identityP=elements(content,'p').find(n=>elements(n,'t').some(t=>t.textContent.trim())),original=elements(identityP,'t').map(n=>n.textContent).join('');fields.push({id:'word-'+fields.length,part:name,pIndex:paragraphs.indexOf(identityP),start:0,end:original.length,label:'Customer legal name — notices',context:'Existing customer name: '+original,existing:original,profileKey:'legalName',replaceFromProfile:true,manual:false});}
     const p=elements(content,'p').find(n=>!elements(n,'t').some(t=>t.textContent.trim())&&!elements(n,'drawing').length&&!elements(n,'pict').length&&!elements(n,'br').length);
     if(!p)continue;
     fields.push({id:'word-'+fields.length,part:name,pIndex:paragraphs.indexOf(p),kind:'emptyParagraph',label:notice?'Customer notice address and contact':label,context:notice?label+': '+existing+' — address, contact name and email':label,manual:false,profileKey:key,multiline:notice||/address|reference/i.test(label)});
@@ -77,7 +81,7 @@
  function fill(form,answers){
   const entries={...form.entries},changes=new Map();
   for(const field of form.fields){
-   const value=answers[field.id];if(field.manual||value==null||String(value).trim()==='')continue;
+   const value=answers[field.id];if(field.manual||value==null||String(value).trim()===''||value===field.existing)continue;
    if(typeof value!=='string'||value.length>1500||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(value))throw Error('An answer is invalid or too long.');
    if(!changes.has(field.part))changes.set(field.part,[]);changes.get(field.part).push({...field,value});
   }
