@@ -82,7 +82,7 @@
    }
    entries[part]=root.fflate.strToU8(new root.XMLSerializer().serializeToString(doc));
   }
-  return root.fflate.zipSync(entries,{level:6});
+  return root.fflate.zipSync(entries,{level:6,mtime:new Date(2000,0,1)});
  }
  root.OverSiteWordForms={open,fill,profileKey,isManual};
 })(typeof window==='undefined'?globalThis:window);
