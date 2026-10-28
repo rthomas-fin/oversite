@@ -1,19 +1,31 @@
 /* Private form preparation: verified profile -> questions -> saved Drive draft. */
 let creditFormSession=null,creditDraftItems=[],creditDraftProblem='',creditDraftLoaded=false,creditDraftLoading=null;
 function formBytes64(bytes){let text='';for(let i=0;i<bytes.length;i+=16384)text+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(text);}
-function creditDraftLinks(file){return `<a class="btn" href="${esc(file.webViewLink||file.url)}" target="_blank" rel="noopener">Open saved draft ↗</a>${file.webContentLink||file.downloadUrl?` <a class="btn primary" href="${esc(file.webContentLink||file.downloadUrl)}" target="_blank" rel="noopener">Download draft ↓</a>`:''}`;}
+function creditSourceName(name){return String(name||'').replace(/ - (?:draft|customer signed)(\.(?:docx|pdf))$/i,'$1').toLowerCase();}
+function savedCreditCopies(){
+ const copies=new Map(creditDraftItems.map(f=>[f.id,f]));
+ for(const r of CLOUD.docs||[]){
+  if(r[1]!=='Credit apps'||! / - customer signed\.(?:docx|pdf)$/i.test(r[2]))continue;
+  const name=creditSourceName(r[2]),sources=new Set();
+  for(const f of creditDraftItems)if(f.sourceId&&creditSourceName(f.name)===name)sources.add(f.sourceId);
+  for(const f of S.intake||[])if(f.bucket==='Credit apps'&&f.driveFileId&&String(f.filename||'').toLowerCase()===name)sources.add(f.driveFileId);
+  copies.set(r[0],{id:r[0],name:r[2],url:r[4],downloadUrl:'https://drive.google.com/uc?id='+encodeURIComponent(r[0])+'&export=download',modified:r[3],sourceId:sources.size===1?[...sources][0]:null,customerSigned:true,remaining:0});
+ }
+ return [...copies.values()];
+}
+function creditDraftLinks(file){return `<a class="btn" href="${esc(file.webViewLink||file.url)}" target="_blank" rel="noopener">${file.customerSigned?'Open signed copy':'Open saved draft'} ↗</a>${file.webContentLink||file.downloadUrl?` <a class="btn primary" href="${esc(file.webContentLink||file.downloadUrl)}" target="_blank" rel="noopener">${file.customerSigned?'Download signed copy':'Download draft'} ↓</a>`:''}`;}
 async function loadCreditDrafts(){
  if(creditDraftLoading)return creditDraftLoading;
  creditDraftLoading=(async()=>{try{const r=await rpcCloud('getCreditDrafts');creditDraftItems=r.items||[];creditDraftProblem='';}catch(e){creditDraftProblem=e.message;}finally{creditDraftLoaded=true;creditDraftLoading=null;}if(!document.querySelector('dialog[open]'))render();document.dispatchEvent(new Event('oversite-form-drafts-updated'));})();
  return creditDraftLoading;
 }
 function savedCreditDrafts(){
- const latest=new Map(),earlier=[];for(const f of creditDraftItems.slice().sort((a,b)=>String(b.modified).localeCompare(String(a.modified)))){const key=f.sourceId||f.id;if(latest.has(key))earlier.push(f);else latest.set(key,f);}
- const row=(f,old=false)=>`<p><b>${esc(f.name)}</b><span class="mini">${old?'Earlier draft · ':''}${f.remaining?f.remaining+' unanswered fields':'Filled draft saved'} · Unsigned · ${esc(f.modified?new Date(f.modified).toLocaleString():'')}</span>${creditDraftLinks(f)}</p>`;
- return `<section class="panel section-gap"><div class="panel-head"><div><h2>Saved form drafts</h2><p class="sub">The latest draft for each form is shown first. Review before use; signatures remain blank.</p></div><button class="btn" data-form="refresh">Refresh drafts</button></div><div class="panel-body">${creditDraftProblem?`<p class="notice">${esc(creditDraftProblem)}</p>`:''}${!creditDraftLoaded?'Checking saved drafts…':latest.size?[...latest.values()].map(f=>row(f)).join(''):'No saved draft found. Use Fill original form to prepare a Word .docx or fillable PDF.'}${earlier.length?`<details><summary>Earlier drafts (${earlier.length})</summary>${earlier.map(f=>row(f,true)).join('')}</details>`:''}</div></section>`;
+ const latest=new Map(),earlier=[];for(const f of savedCreditCopies().sort((a,b)=>String(b.modified).localeCompare(String(a.modified)))){const key=f.sourceId||f.id;if(latest.has(key))earlier.push(f);else latest.set(key,f);}
+ const row=(f,old=false)=>`<p><b>${esc(f.name)}</b><span class="mini">${old?'Earlier copy · ':''}${f.customerSigned?'Customer-signed copy':(f.remaining?f.remaining+' unanswered fields':'Filled draft saved')+' · Unsigned'} · ${esc(f.modified?new Date(f.modified).toLocaleString():'')}</span>${creditDraftLinks(f)}</p>`;
+ return `<section class="panel section-gap"><div class="panel-head"><div><h2>Saved forms</h2><p class="sub">The latest saved copy for each form is shown first. Customer-signed copies are labeled separately from unsigned drafts.</p></div><button class="btn" data-form="refresh">Refresh drafts</button></div><div class="panel-body">${creditDraftProblem?`<p class="notice">${esc(creditDraftProblem)}</p>`:''}${!creditDraftLoaded?'Checking saved drafts…':latest.size?[...latest.values()].map(f=>row(f)).join(''):'No saved draft found. Use Fill original form to prepare a Word .docx or fillable PDF.'}${earlier.length?`<details><summary>Earlier copies (${earlier.length})</summary>${earlier.map(f=>row(f,true)).join('')}</details>`:''}</div></section>`;
 }
 const inboxBeforeForms=driveInboxCloud;
-driveInboxCloud=function(bucket){const holder=document.createElement('div');holder.innerHTML=inboxBeforeForms(bucket);for(const row of holder.querySelectorAll('tbody tr')){const action=row.querySelector('[data-cloud="read-doc"]');if(action&&creditDraftItems.some(f=>f.id===action.dataset.id)){row.children[2].textContent='Saved form draft';action.remove();}}return holder.innerHTML;};
+driveInboxCloud=function(bucket){const holder=document.createElement('div');holder.innerHTML=inboxBeforeForms(bucket);for(const row of holder.querySelectorAll('tbody tr')){const action=row.querySelector('[data-cloud="read-doc"]'),copy=action&&savedCreditCopies().find(f=>f.id===action.dataset.id);if(copy){row.children[2].textContent=copy.customerSigned?'Customer-signed copy':'Saved form draft';action.remove();}}return holder.innerHTML;};
 const filesWithIntake=filesScreenV3,creditWithIntake=creditScreenV3,queueWithIntake=reviewQueueIntake;
 filesScreenV3=function(){return filesWithIntake()+savedCreditDrafts();};
 creditScreenV3=function(){return creditWithIntake()+savedCreditDrafts();};
