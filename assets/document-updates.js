@@ -28,10 +28,11 @@ const queueBeforeUpdates=reviewQueueIntake;
 reviewQueueIntake=function(){const box=document.createElement('div');box.innerHTML=queueBeforeUpdates();const current=new Set(latestDocumentRows().map(x=>x.id));for(const row of box.querySelectorAll('tbody tr')){const id=row.querySelector('[data-intake="details"],[data-intake="archive"]')?.dataset.id,x=S.intake.find(x=>x.id===id);if(!x)continue;if(!intakeShowArchived&&!current.has(x.id)){row.remove();continue;}
  if(['payment-reference','statement','email'].includes(x.documentType)){
   for(const b of row.querySelectorAll('[data-burn="review-file"],[data-form="prepare"]'))b.remove();
+  if(x.documentType!=='statement')row.children[2].innerHTML=esc(x.party||'')+'<span class="mini">Saved document</span>';
   row.children[2].insertAdjacentHTML('beforeend',`<span class="mini">${esc(x.referenceType||x.documentType)}${x.bank?' · '+esc(x.bank):''}${x.accountLast4?' · account ending '+esc(x.accountLast4):''}</span>`);
  }
  if(x.status==='Reconciled'||x.status==='Saved reference')row.lastElementChild.insertAdjacentHTML('afterbegin',`<span class="mini">${esc(x.note)}</span>`);
  if(x.status!=='Posted'&&x.status!=='Reconciled'&&x.driveFileId)row.lastElementChild.insertAdjacentHTML('beforeend',`<button class="btn small" data-intake="retry" data-id="${esc(x.driveFileId)}">Process again</button>`);
-}return box.innerHTML;};
+}const summary=box.querySelector('.panel-head .sub');if(summary)summary.textContent=box.querySelectorAll('tbody tr').length+' displayed records · '+S.intake.length+' including history · complete AR/AP invoices update the ledger; unclear items need review';return box.innerHTML;};
 setInterval(()=>{if(document.visibilityState==='visible')paintDocumentUpdates();},5000);
 paintDocumentUpdates();render();
