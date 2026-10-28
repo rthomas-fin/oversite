@@ -4,7 +4,11 @@ function formBytes64(bytes){let text='';for(let i=0;i<bytes.length;i+=16384)text
 function creditSourceName(name){return String(name||'').replace(/ - (?:draft|customer signed)(\.(?:docx|pdf))$/i,'$1').toLowerCase();}
 function savedCreditCopies(){
  const copies=new Map(creditDraftItems.map(f=>[f.id,f]));
- for(const r of CLOUD.docs||[]){
+ // The shared intake arrives before the folder index during sign-in.
+ const inventory=new Map();
+ for(const f of S.intake||[])if(f.status!=='Archived'&&f.driveFileId){const row=[f.driveFileId,f.bucket,f.filename,f.sourceModified,f.sourceUrl];if(!inventory.has(f.driveFileId)||String(row[3])>String(inventory.get(f.driveFileId)[3]))inventory.set(f.driveFileId,row);}
+ for(const r of CLOUD.docs||[])inventory.set(r[0],r);
+ for(const r of inventory.values()){
   if(r[1]!=='Credit apps'||! / - customer signed\.(?:docx|pdf)$/i.test(r[2]))continue;
   const name=creditSourceName(r[2]),sources=new Set();
   for(const f of creditDraftItems)if(f.sourceId&&creditSourceName(f.name)===name)sources.add(f.sourceId);
