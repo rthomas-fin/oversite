@@ -9,8 +9,8 @@ driveInboxCloud=function(bucket){const holder=document.createElement('div');hold
 const filesWithIntake=filesScreenV3,creditWithIntake=creditScreenV3,queueWithIntake=reviewQueueIntake;
 filesScreenV3=function(){return filesWithIntake()+savedCreditDrafts();};
 creditScreenV3=function(){return creditWithIntake()+savedCreditDrafts();};
-reviewQueueIntake=function(){const holder=document.createElement('div');holder.innerHTML=queueWithIntake();for(const row of holder.querySelectorAll('tbody tr')){const id=row.querySelector('[data-intake="details"]')?.dataset.id,x=S.intake.find(r=>r.id===id);if(x?.bucket==='Credit apps'&&x.driveFileId&&/\.docx$/i.test(x.filename))row.lastElementChild.insertAdjacentHTML('beforeend',`<button class="btn small" data-form="prepare" data-id="${esc(x.driveFileId)}">Prepare form draft</button>`);}return holder.innerHTML;};
-profileFields.push(['entityDescription','Registered entity description (for example: a Texas limited liability company)'],['signatoryName','Authorized representative — printed name'],['signatoryTitle','Authorized representative — title']);
+reviewQueueIntake=function(){const holder=document.createElement('div');holder.innerHTML=queueWithIntake();for(const row of holder.querySelectorAll('tbody tr')){const id=row.querySelector('[data-intake="details"]')?.dataset.id,x=S.intake.find(r=>r.id===id);if(x?.bucket==='Credit apps'&&x.driveFileId&&/\.(?:docx|pdf)$/i.test(x.filename)){for(const action of row.querySelectorAll('[data-intake="details"],[data-intake="fill-pdf"],[data-burn="review-file"]'))action.remove();row.lastElementChild.insertAdjacentHTML('afterbegin',`<button class="btn small primary" data-form="prepare" data-id="${esc(x.driveFileId)}">Fill original form</button>`);}}return holder.innerHTML;};
+profileFields.push(['entityDescription','Registered entity description (for example: a Texas limited liability company)'],['noticeDetails','Legal notice address, contact name and email'],['signatoryName','Authorized representative — printed name'],['signatoryTitle','Authorized representative — title']);
 async function openCreditForm(id){
  await intakeReady();toast('Reading the form and matching saved company details…');
  const source=await rpcCloud('getCreditForm',id),bytes=Uint8Array.from(atob(source.data),c=>c.charCodeAt(0));
@@ -26,7 +26,7 @@ async function openCreditForm(id){
  session.initialAnswers={...session.answers};
  creditFormSession=session;
  if(intakeDialog.open)intakeDialog.close();
- if(!session.fields.length){intakeModal('Form needs manual completion',`<p>No supported blank text fields were found. The original is stored in Credit apps and its extracted text is available for review. Flat/scanned PDFs need a fillable version.</p><a class="btn" href="https://drive.google.com/file/d/${encodeURIComponent(id)}/view" target="_blank" rel="noopener">Open original ↗</a>`);return;}
+ if(!session.fields.length){intakeModal('Form needs manual completion',`<p>No supported blank text fields were found. The original is stored in Credit apps. Flat/scanned PDFs need a fillable version.</p><a class="btn" href="https://drive.google.com/file/d/${encodeURIComponent(id)}/view" target="_blank" rel="noopener">Open original ↗</a>`);return;}
  showCreditQuestions();
  // Save fully answered forms immediately. Unknown answers are never invented.
  if(session.fields.every(f=>session.answers[f.id].trim()))await savePreparedCredit();
@@ -34,7 +34,7 @@ async function openCreditForm(id){
 preparePdf=async function(id){return openCreditForm(id);};
 function showCreditQuestions(){
  const s=creditFormSession,missing=s.fields.filter(f=>!s.answers[f.id].trim());
- intakeModal('Prepare form — '+s.source.name,`<p>${missing.length?'Please answer '+missing.length+' missing field'+(missing.length===1?'':'s')+'. Saved company details have been filled where the labels match.':'All detected fields have answers. Verify them before using the draft.'}</p><p class="mini">Company answers you enter are remembered for future forms when you save. Existing wording and filled values are preserved. Signature, consent and ambiguous signing lines stay unchanged.</p>${s.saved?`<div class="notice">Draft saved in Credit apps. ${creditDraftLinks(s.saved)}</div>`:''}<div class="form-grid">${s.fields.map(f=>`<label class="field">${esc(f.label)}${s.answers[f.id]?'':' · answer needed'}<span class="mini">${esc(f.context)}</span><input data-form-answer="${esc(f.id)}" maxlength="1500" value="${esc(s.answers[f.id])}"></label>`).join('')}</div><p><button class="btn primary" data-form="save">Save answers and create download link</button></p><p class="mini">You may save an incomplete draft and return to the original to finish it. No agreement is signed or submitted.</p>`);
+ intakeModal('Fill original form — '+s.source.name,`<p>${missing.length?'Please answer '+missing.length+' missing field'+(missing.length===1?'':'s')+'. Saved company details have been filled where the labels match.':'The detected text fields have answers. Verify them before using the draft.'}</p><p class="mini">Answers go into the original document format. Company answers you enter are remembered for future forms when you save. Existing wording and filled values are preserved.</p>${s.saved?`<div class="notice">${missing.length?'Incomplete draft':'Draft'} saved in Credit apps. ${creditDraftLinks(s.saved)}</div>`:''}<div class="form-grid">${s.fields.map(f=>`<label class="field">${esc(f.label)}${s.answers[f.id]?'':' · answer needed'}<span class="mini">${esc(f.context)}</span>${f.multiline?`<textarea data-form-answer="${esc(f.id)}" maxlength="1500" rows="4">${esc(s.answers[f.id])}</textarea>`:`<input data-form-answer="${esc(f.id)}" maxlength="1500" value="${esc(s.answers[f.id])}">`}</label>`).join('')}</div><p><button class="btn primary" data-form="save">Fill document and save download link</button></p><p class="mini">${s.word?.manual.length?'Signature or ambiguous signing areas also remain for manual completion. ':''}You may save an incomplete draft. Nothing is signed or submitted.</p>`);
 }
 async function savePreparedCredit(){
  const s=creditFormSession;if(!s||s.busy)return;
@@ -48,7 +48,7 @@ async function savePreparedCredit(){
   const verified=Object.fromEntries(s.fields.filter(f=>f.profileKey&&!f.existing&&s.answers[f.id]&&s.answers[f.id]!==s.initialAnswers[f.id]).map(f=>[f.profileKey,s.answers[f.id]]));
   if(Object.entries(verified).some(([key,value])=>S.companyProfile?.[key]!==value)){S.companyProfile={...S.companyProfile,...verified};save('Remembered verified company answers from form');await saveCloud();}
   await loadCreditDrafts();await documentChangedCloud();intakeDialog.close();showCreditQuestions();toast('Draft saved in Credit apps. The download link is ready.');
- }finally{s.busy=false;if(button){button.disabled=false;button.textContent='Save answers and create download link';}}
+ }finally{s.busy=false;if(button){button.disabled=false;button.textContent='Fill document and save download link';}}
 }
 document.addEventListener('click',async e=>{const t=e.target.closest('[data-form]');if(!t)return;try{if(t.dataset.form==='prepare')await openCreditForm(t.dataset.id);if(t.dataset.form==='save')await savePreparedCredit();if(t.dataset.form==='refresh')await loadCreditDrafts();}catch(error){toast(error.message);}});
 document.addEventListener('input',e=>{if(e.target.dataset.formAnswer&&creditFormSession)creditFormSession.answers[e.target.dataset.formAnswer]=e.target.value;});

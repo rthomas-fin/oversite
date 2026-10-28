@@ -4,7 +4,7 @@
  const W='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
  const elements=(node,name)=>Array.from(node.getElementsByTagNameNS(W,name));
  const attr=(node,name)=>node?.getAttributeNS(W,name)||'';
- const isManual=label=>/signature|signed|guarant|consent|authoriz|social.security|\bssn\b|routing|account.number/i.test(label);
+ const isManual=label=>/signature|signed|guarant|consent|authoriz(?!ed representative name)|social.security|\bssn\b|routing|account.number/i.test(label);
  function profileKey(label){
   const key=String(label).toLowerCase().replace(/[^a-z]/g,'');
   const groups={legalName:['legalbusinessname','legalcompanyname','companyname','businessname','applicantname','customername'],dba:['dba','doingbusinessas'],address:['address','businessaddress','billingaddress','mailingaddress'],phone:['phone','businessphone','telephone'],email:['email','businessemail'],entityType:['entitytype','businesstype'],entityDescription:['companyentitydescription'],formationDate:['formationdate','dateestablished'],contact:['contact','contactname'],signatoryName:['printedname','signatoryname','authorizedrepresentativename'],signatoryTitle:['title','signatorytitle'],tradeReferences:['tradereferences']};
@@ -25,6 +25,7 @@
   const fields=[],parts={},manual=[];
   for(const name of Object.keys(entries).filter(n=>/^word\/(document|header\d*|footer\d*)\.xml$/.test(n))){
    const doc=xml(root.fflate.strFromU8(entries[name]));parts[name]=doc;
+   const paragraphs=elements(doc,'p');
    for(const [pIndex,p] of elements(doc,'p').entries()){
     const nodes=elements(p,'t'),text=nodes.map(n=>n.textContent).join('');
     if(!text.trim())continue;
@@ -43,6 +44,22 @@
      const field={id:'word-'+fields.length,part:name,pIndex,start:match.index,end:match.index+match[0].length,label,context,manual:blocked,profileKey:blocked?null:profileKey(label)};
      fields.push(field);if(blocked)manual.push(field);
     }
+   }
+   // A labelled, otherwise empty table cell is a real form field even without underscores.
+   for(const row of elements(doc,'tr')){
+    const cells=Array.from(row.childNodes).filter(n=>n.namespaceURI===W&&n.localName==='tc');
+    if(cells.length!==2)continue;
+    const label=elements(cells[0],'t').map(n=>n.textContent).join('').trim().replace(/:$/,'');
+    const notice=/^if to (?:the )?(?:customer|applicant|tenant|lessee)$/i.test(label);
+    const key=notice?'noticeDetails':profileKey(label);
+    if(!key||isManual(label))continue;
+    const content=cells[1],existing=elements(content,'t').map(n=>n.textContent).join('').trim();
+    if(!notice&&existing)continue;
+    if(notice&&elements(content,'p').filter(n=>elements(n,'t').some(t=>t.textContent.trim())).length>1)continue;
+    if(['sdt','tbl','fldChar','del','ins'].some(tag=>elements(content,tag).length))continue;
+    const p=elements(content,'p').find(n=>!elements(n,'t').some(t=>t.textContent.trim())&&!elements(n,'drawing').length&&!elements(n,'pict').length&&!elements(n,'br').length);
+    if(!p)continue;
+    fields.push({id:'word-'+fields.length,part:name,pIndex:paragraphs.indexOf(p),kind:'emptyParagraph',label:notice?'Customer notice address and contact':label,context:notice?label+': '+existing+' — address, contact name and email':label,manual:false,profileKey:key,multiline:notice||/address|reference/i.test(label)});
    }
    // Plain-text content controls with an explicit placeholder are supported.
    for(const [sIndex,sdt] of elements(doc,'sdt').entries()){
@@ -72,7 +89,18 @@
     nodes[0].textContent=f.value;nodes[0].setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');for(const n of nodes.slice(1))n.textContent='';
     const placeholder=elements(sdt,'showingPlcHdr')[0];placeholder?.parentNode.removeChild(placeholder);
    }
-   for(const f of fields.filter(f=>f.pIndex!==undefined).sort((a,b)=>b.pIndex-a.pIndex||b.start-a.start)){
+   for(const f of fields.filter(f=>f.kind==='emptyParagraph')){
+    const p=elements(doc,'p')[f.pIndex];
+    if(elements(p,'t').some(n=>n.textContent.trim()))throw Error('The original blank is no longer empty. Reopen the form.');
+    const run=doc.createElementNS(W,'w:r'),style=elements(p,'rPr')[0];
+    if(style)run.appendChild(style.cloneNode(true));
+    for(const [i,line]of f.value.split(/\r?\n/).entries()){
+     if(i)run.appendChild(doc.createElementNS(W,'w:br'));
+     const text=doc.createElementNS(W,'w:t');text.setAttributeNS('http://www.w3.org/XML/1998/namespace','xml:space','preserve');text.textContent=line;run.appendChild(text);
+    }
+    p.appendChild(run);
+   }
+   for(const f of fields.filter(f=>f.pIndex!==undefined&&f.kind!=='emptyParagraph').sort((a,b)=>b.pIndex-a.pIndex||b.start-a.start)){
     const nodes=elements(elements(doc,'p')[f.pIndex],'t');let offset=0,inserted=false;
     for(const node of nodes){const text=node.textContent,start=offset,end=start+text.length;offset=end;if(end<=f.start||start>=f.end)continue;
      const prefix=text.slice(0,Math.max(0,f.start-start)),suffix=text.slice(Math.min(text.length,f.end-start));
