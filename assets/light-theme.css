@@ -1,11 +1,11 @@
 /* C3 guide, adapted for a white workspace. Shared by live and sample views. */
 @font-face{font-family:Inter;src:url('./inter.ttf') format('truetype');font-style:normal;font-weight:100 900;font-display:swap}
 :root{
- --page:#fff;--card:#fff;--raised:#edf3f8;--field:#f6f8fb;--border:#cbd5e1;--divider:#e5eaf0;
- --text-primary:#1d2b3d;--text-secondary:#46576b;--text-muted:#5e6e80;
+ --page:#fff;--card:#edf1f5;--raised:#dce6ef;--field:#e3eaf0;--border:#b9c7d5;--divider:#d2dce5;
+ --text-primary:#1d2b3d;--text-secondary:#46576b;--text-muted:#526174;
  --accent:#16c2d5;--accent-hover:#3fd0e0;--on-accent:#04242a;--link:#12657c;
  --success-bg:#e8f5ee;--success-text:#176344;--warning-bg:#fff4df;--warning-text:#825013;
- --danger-bg:#fcecee;--danger-text:#a52d3c;--info-bg:#eaf3fa;--info-text:#245c83;
+ --danger-bg:#fcecee;--danger-text:#a52d3c;--info-bg:#e0edf6;--info-text:#245c83;
  --radius-control:8px;--radius-card:10px;--radius-badge:6px;
  --font-sans:Inter,system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
  --nav:var(--page);--ink:var(--text-primary);--muted:var(--text-muted);--line:var(--border);--bg:var(--page);
@@ -162,3 +162,23 @@ dialog::backdrop{background:rgba(29,43,61,.28);backdrop-filter:none}
 .burn-matrix thead .m-cell small{font-size:12px;font-weight:400;white-space:normal;overflow-wrap:anywhere;line-height:1.5}
 
 th.money{font-size:12px;font-weight:400}
+
+/* Surface hierarchy from the guide: white page, grey cards, blue-grey insets. */
+header{background:var(--card)}
+.workspace,.scenario-chip,.home-settings>summary{background:var(--card)}
+.panel,.stat,.metric,.run-card,.folder-card,.intake-card{background:var(--card)}
+.panel-head,.toolbar,.credit-register-v4 .toolbar{background:var(--card);border-radius:10px 10px 0 0}
+.panel-body,.dialog-head{background:var(--card)}
+th,.burn-table th{background:var(--raised)}
+td{background:transparent}
+.btn,.cloud-bar button,.side-button{background:transparent}
+.btn:hover,.side-button:hover,.cloud-bar button:hover{background:var(--raised)}
+.btn.primary{background:var(--accent)}.btn.primary:hover{background:var(--accent-hover)}
+.btn.danger{background:transparent}
+.burn-matrix-wrap,.matrix-controls,.matrix-legend,.matrix-footnote,.burn-matrix .m-label,.burn-matrix .m-value{background:var(--card)}
+.burn-matrix .m-summary td,.burn-matrix .m-summary .m-label,.burn-matrix .m-subtotal td,.burn-matrix .m-subtotal .m-label{background:var(--field)}
+.burn-matrix .m-ending td,.burn-matrix .m-ending .m-label{background:var(--info-bg)}
+.burn-matrix .m-section td,.burn-matrix .m-section .m-label{background:#d5e1ec;color:#334f6b}
+.burn-matrix .m-section:nth-of-type(even) td,.burn-matrix .m-section:nth-of-type(even) .m-label{background:#dce6ef}
+.burn-matrix .m-summary .m-value.is-negative{background:var(--danger-bg)}
+.burn-matrix .m-summary .m-value.is-low,.burn-matrix .m-cell.has-allowance,.burn-matrix .m-right{background:var(--warning-bg)}
