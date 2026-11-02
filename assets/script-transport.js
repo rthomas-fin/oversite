@@ -12,7 +12,8 @@
    this.#token=token;this.#expires=this.now()+Number(seconds)*1000;
   }
   clearToken(){this.#token='';this.#expires=0;}
-  needsAuth(){return !this.#token||this.now()+360000>=this.#expires;}
+  needsAuth(){return !this.#token||this.now()+90000>=this.#expires;}
+  needsRenewal(){return !this.#token||this.now()+300000>=this.#expires;}
   authError(){this.onAuthRequired();return Object.assign(Error('Reconnect Google. Your on-screen edits are retained.'),{authRequired:true});}
   async call(name,...args){
    if(!allowed.has(name)||args.length>1)throw Error('Unsupported dashboard action.');
@@ -51,7 +52,7 @@
   constructor({storage,key,now=Date.now}){Object.assign(this,{storage,key,now});}
   clear(){try{this.storage.removeItem(this.key);}catch{}}
   save(token,seconds){try{if(typeof token!=='string'||!token||!Number.isFinite(Number(seconds)))return;this.storage.setItem(this.key,JSON.stringify({token,expiresAt:this.now()+Math.min(Number(seconds),3600)*1000}));}catch{}}
-  read(){try{const s=JSON.parse(this.storage.getItem(this.key)||'null');if(!s||typeof s.token!=='string'||!s.token||!Number.isFinite(s.expiresAt)||s.expiresAt-this.now()<=360000||s.expiresAt-this.now()>3600000){this.clear();return null;}return {token:s.token,seconds:(s.expiresAt-this.now())/1000};}catch{this.clear();return null;}}
+  read(){try{const s=JSON.parse(this.storage.getItem(this.key)||'null');if(!s||typeof s.token!=='string'||!s.token||!Number.isFinite(s.expiresAt)||s.expiresAt-this.now()<=90000||s.expiresAt-this.now()>3600000){this.clear();return null;}return {token:s.token,seconds:(s.expiresAt-this.now())/1000};}catch{this.clear();return null;}}
  }
  root.OverSiteTabSession=TabSession;
  root.OverSiteScriptTransport=ScriptTransport;
