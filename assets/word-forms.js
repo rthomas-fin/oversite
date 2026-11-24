@@ -8,6 +8,7 @@
  function profileKey(label){
   const key=String(label).toLowerCase().replace(/[^a-z]/g,'');
   const groups={legalName:['legalbusinessname','legalcompanyname','companyname','businessname','applicantname','customername'],dba:['dba','doingbusinessas'],address:['address','businessaddress','billingaddress','mailingaddress'],phone:['phone','businessphone','telephone'],email:['email','businessemail'],entityType:['entitytype','businesstype'],entityDescription:['companyentitydescription'],formationState:['stateofformation','stateofincorporation'],formationDate:['formationdate','dateestablished'],contact:['contact','contactname'],ceoName:['ceo','ceoname','chiefexecutiveofficer'],ceoEmail:['ceoemail'],signatoryName:['printedname','signatoryname','authorizedrepresentativename'],signatoryTitle:['title','signatorytitle'],tradeReferences:['tradereferences']};
+  Object.assign(groups,{ein:['ein','federaltaxid','federalemployeridentificationnumber','taxid'],website:['website','businesswebsite','companywebsite'],formationYear:['yearformed','yearestablished'],businessDescription:['typeofbusiness','businessdescription'],businessStreet:['businessstreetaddress'],businessCity:['businesscity'],businessState:['businessstate'],businessZip:['businesszip','businesszipcode'],bankName:['businessbankname'],bankPhone:['businessbankphone'],bankContact:['businessbankcontact']});
   return Object.keys(groups).find(k=>groups[k].includes(key));
  }
  function xml(text){

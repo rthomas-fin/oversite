@@ -102,7 +102,7 @@ function startFolderPolling(){
  folderPoller=new window.OverSiteDrivePoller({
   scan:()=>rpcCloud('scanFolders'),
   canRun:()=>CLOUD.ready&&!CLOUD.saving&&!CLOUD.authRequired&&!window.OverSiteTransport.needsAuth()&&navigator.onLine&&document.visibilityState==='visible',
-  onResult:r=>{const changed=JSON.stringify(r.items)!==JSON.stringify(CLOUD.docs);CLOUD.docs=r.items||[];CLOUD.docsError=(r.errors||[]).join('; ');if(changed){if(['files','credit'].includes(page)&&safeFolderRender())render();else folderPendingRender=true;}if(r.queued>0)void documentChangedCloud();},
+  onResult:r=>{const changed=JSON.stringify(r.items)!==JSON.stringify(CLOUD.docs);CLOUD.docs=r.items||[];CLOUD.docsError=(r.errors||[]).join('; ');if(changed){if(['files','credit'].includes(page)&&safeFolderRender())render();else folderPendingRender=true;}if(r.queued>0)void documentChangedCloud();document.dispatchEvent(new Event('oversite-folders-checked'));},
   onStatus:s=>{folderStatus=s.message+(s.lastChecked?' · Last checked '+new Date(s.lastChecked).toLocaleTimeString():'')+(s.error?' · '+s.error:'');paintFolderStatus();}
  });
  folderPoller.start();
